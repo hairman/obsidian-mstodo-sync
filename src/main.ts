@@ -1,4 +1,4 @@
-import { Plugin, Notice, ObsidianProtocolData } from 'obsidian';
+import { Plugin, Notice, ObsidianProtocolData, addIcon } from 'obsidian';
 import { MsTodoSyncSettings } from './interfaces';
 import { DEFAULT_SETTINGS } from './constants';
 import { AuthManager } from './auth/auth-manager';
@@ -6,6 +6,9 @@ import { GraphClient } from './api/graph-client';
 import { ObsidianFileManager } from './obsidian/file-manager';
 import { SyncEngine } from './core/sync-engine';
 import { MsTodoSyncSettingTab } from './ui/settings-tab';
+
+// SVG для логотипа Microsoft To Do в стиле контурных иконок Obsidian (100x100)
+const MSTODO_ICON_SVG = `<circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" stroke-width="8" /><path d="M30 52l15 15 30-35" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />`;
 
 export default class MsTodoSyncPlugin extends Plugin {
 	settings: MsTodoSyncSettings;
@@ -17,10 +20,18 @@ export default class MsTodoSyncPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
+		// Регистрация кастомной иконки
+		addIcon('mstodo-logo', MSTODO_ICON_SVG);
+
 		this.auth = new AuthManager(this.app, this.settings);
 		this.graphClient = new GraphClient(this.auth);
 		this.fileManager = new ObsidianFileManager(this.app);
 		this.syncEngine = new SyncEngine(this.app, this.settings, this.fileManager, this.graphClient);
+
+		// Добавление кнопки синхронизации на боковую панель с кастомной иконкой
+		this.addRibbonIcon('mstodo-logo', 'Sync with Microsoft To Do', () => {
+			this.syncEngine.runSync();
+		});
 
 		// Регистрация хендлера протокола для авторизации
 		this.registerObsidianProtocolHandler('mstodo-sync-auth', async (data: ObsidianProtocolData) => {
