@@ -319,11 +319,23 @@ export class SyncEngine {
 			
 			// Пытаемся использовать шаблон, если он настроен
 			if (this.settings.dailyNoteTemplatePath) {
-				const templateFile = this.app.vault.getAbstractFileByPath(this.settings.dailyNoteTemplatePath);
+				let templatePath = this.settings.dailyNoteTemplatePath;
+				if (!templatePath.endsWith('.md')) {
+					templatePath += '.md';
+				}
+				
+				const templateFile = this.app.vault.getAbstractFileByPath(normalizePath(templatePath));
 				if (templateFile instanceof TFile) {
 					content = await this.app.vault.read(templateFile);
-					// Простая замена даты, если есть плейсхолдеры (как в Templater/Daily Notes)
+					// Простая замена даты, если есть плейсхолдеры
 					content = content.replace(/{{date}}|{{TITLE}}/g, date.format('YYYY-MM-DD'));
+					
+					// Убеждаемся, что в шаблоне есть нужный раздел, если нет - добавляем его
+					if (this.settings.dailyNoteSection && !content.includes(this.settings.dailyNoteSection)) {
+						content += `\n\n${this.settings.dailyNoteSection}\n`;
+					}
+				} else {
+					new Notice(`Template file not found at: ${templatePath}`);
 				}
 			}
 			
