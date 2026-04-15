@@ -32,8 +32,8 @@ export class SyncEngine {
 			// 1. Pre-sync: сканируем локальные изменения
 			await this.preSyncLocalScan();
 			
-			// Дополнительно сканируем ежедневные заметки на наличие новых задач с тегом
-			await this.scanDailyNotesForNewTasks();
+			// Сканируем ВСЕ заметки на наличие новых задач с тегом
+			await this.scanAllNotesForNewTasks();
 
 			// 2. Import: получаем изменения из MS To Do
 			await this.importFromRemote();
@@ -78,9 +78,9 @@ export class SyncEngine {
 			const fm = cache?.frontmatter as TaskFrontMatter;
 			if (!fm || !fm.sourceDailyNotePath || !fm.sourceBlockId) continue;
 
-			const dailyFile = this.app.vault.getAbstractFileByPath(fm.sourceDailyNotePath);
-			if (dailyFile instanceof TFile) {
-				const content = await this.app.vault.read(dailyFile);
+			const sourceFile = this.app.vault.getAbstractFileByPath(fm.sourceDailyNotePath);
+			if (sourceFile instanceof TFile) {
+				const content = await this.app.vault.read(sourceFile);
 				const blockRegex = new RegExp(`- \\[([ xX])\\].*\\^${fm.sourceBlockId}`);
 				const match = content.match(blockRegex);
 				
@@ -99,17 +99,20 @@ export class SyncEngine {
 	}
 
 	/**
-	 * Ищет новые задачи с тегом в ежедневных заметках.
+	 * Ищет новые задачи с тегом во ВСЕХ заметках.
 	 */
-	private async scanDailyNotesForNewTasks() {
-		const dailyNotesFolder = this.app.vault.getAbstractFileByPath(this.settings.dailyNoteFolder);
-		if (!(dailyNotesFolder instanceof TFolder)) return;
-
-		const files = dailyNotesFolder.children.filter(f => f instanceof TFile && f.extension === 'md') as TFile[];
+	private async scanAllNotesForNewTasks() {
+		const allFiles = this.app.vault.getMarkdownFiles();
 		const syncTag = this.settings.syncTag;
+		const taskNotesFolder = this.settings.taskNotesFolder;
 		
-		for (const file of files) {
+		for (const file of allFiles) {
+			// Пропускаем саму папку с задачами
+			if (file.path.startsWith(taskNotesFolder)) continue;
+
 			const content = await this.app.vault.read(file);
+			if (!content.includes(syncTag)) continue;
+
 			const lines = content.split('\n');
 			let changed = false;
 			const newLines = [...lines];
@@ -124,7 +127,7 @@ export class SyncEngine {
 						const title = match[2].trim();
 						const blockId = this.fileManager.generateBlockId();
 						
-						// Создаем локальный файл задачи без msTodoId (он появится после экспорта)
+						// Создаем локальный файл задачи без msTodoId
 						const metadata: TaskFrontMatter = {
 							msTodoId: '',
 							msTodoListId: this.settings.defaultTodoListId,
@@ -141,10 +144,10 @@ export class SyncEngine {
 
 						await this.fileManager.createTaskFile(this.settings.taskNotesFolder, title, metadata);
 						
-						// Обновляем строку в Daily Note, добавляя blockId
+						// Обновляем строку в заметке, добавляя blockId
 						newLines[i] = `${line.trim()} ^${blockId}`;
 						changed = true;
-						this.stats.remoteCreated++; // Предварительно считаем как создаваемую удаленно
+						this.stats.remoteCreated++;
 					}
 				}
 			}
