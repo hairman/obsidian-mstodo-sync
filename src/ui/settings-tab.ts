@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import MsTodoSyncPlugin from '../main';
+import { FileSuggest, FolderSuggest } from './suggest';
 
 export class MsTodoSyncSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: MsTodoSyncPlugin) {
@@ -78,21 +79,25 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Task Notes Folder')
 			.setDesc('Folder where individual task notes will be stored')
-			.addText(text => text
-				.setValue(this.plugin.settings.taskNotesFolder)
-				.onChange(async (value) => {
-					this.plugin.settings.taskNotesFolder = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				new FolderSuggest(this.app, text.inputEl);
+				text.setValue(this.plugin.settings.taskNotesFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.taskNotesFolder = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		new Setting(containerEl)
 			.setName('Daily Note Folder')
-			.addText(text => text
-				.setValue(this.plugin.settings.dailyNoteFolder)
-				.onChange(async (value) => {
-					this.plugin.settings.dailyNoteFolder = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				new FolderSuggest(this.app, text.inputEl);
+				text.setValue(this.plugin.settings.dailyNoteFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.dailyNoteFolder = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		new Setting(containerEl)
 			.setName('Daily Note Filename Pattern')
@@ -107,12 +112,14 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Daily Note Template Path')
 			.setDesc('Optional: path to template for new Daily Notes')
-			.addText(text => text
-				.setValue(this.plugin.settings.dailyNoteTemplatePath)
-				.onChange(async (value) => {
-					this.plugin.settings.dailyNoteTemplatePath = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				new FileSuggest(this.app, text.inputEl);
+				text.setValue(this.plugin.settings.dailyNoteTemplatePath)
+					.onChange(async (value) => {
+						this.plugin.settings.dailyNoteTemplatePath = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		new Setting(containerEl)
 			.setName('Daily Note Section')

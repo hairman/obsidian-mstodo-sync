@@ -324,17 +324,23 @@ export class SyncEngine {
 					templatePath += '.md';
 				}
 				
-				const templateFile = this.app.vault.getAbstractFileByPath(normalizePath(templatePath));
+				const normalizedPath = normalizePath(templatePath);
+				console.log(`[MsTodoSync] Attempting to load template from: ${normalizedPath}`);
+				
+				const templateFile = this.app.vault.getAbstractFileByPath(normalizedPath);
 				if (templateFile instanceof TFile) {
+					console.log(`[MsTodoSync] Template file found, reading content...`);
 					content = await this.app.vault.read(templateFile);
 					// Простая замена даты, если есть плейсхолдеры
 					content = content.replace(/{{date}}|{{TITLE}}/g, date.format('YYYY-MM-DD'));
 					
 					// Убеждаемся, что в шаблоне есть нужный раздел, если нет - добавляем его
 					if (this.settings.dailyNoteSection && !content.includes(this.settings.dailyNoteSection)) {
+						console.log(`[MsTodoSync] Section ${this.settings.dailyNoteSection} not found in template, appending...`);
 						content += `\n\n${this.settings.dailyNoteSection}\n`;
 					}
 				} else {
+					console.error(`[MsTodoSync] Template file NOT found at: ${normalizedPath}`);
 					new Notice(`Template file not found at: ${templatePath}`);
 				}
 			}
