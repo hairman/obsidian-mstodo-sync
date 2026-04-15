@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-mstodo-sync-v2",
+	"name": "microsoft-to-do-sync",
 	"version": "1.0.0",
 	"description": "Advanced two-way synchronization between Obsidian and Microsoft To Do",
 	"main": "main.js",
