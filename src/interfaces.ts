@@ -2,6 +2,8 @@ export interface MsTodoSyncSettings {
 	taskNotesFolder: string;
 	dailyNoteFolder: string;
 	dailyNoteFilenamePattern: string;
+	dailyNoteTemplatePath: string;
+	dailyNoteSection: string;
 	syncTag: string;
 	defaultTodoListId: string;
 	clientId: string;

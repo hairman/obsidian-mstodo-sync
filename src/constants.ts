@@ -7,6 +7,8 @@ export const DEFAULT_SETTINGS: any = {
 	taskNotesFolder: 'Tasks/MS-To-Do',
 	dailyNoteFolder: 'Daily',
 	dailyNoteFilenamePattern: 'YYYY-MM-DD',
+	dailyNoteTemplatePath: '',
+	dailyNoteSection: '## Tasks',
 	syncTag: '#mstodo',
 	defaultTodoListId: '',
 	clientId: 'YOUR_CLIENT_ID',

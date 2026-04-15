@@ -104,6 +104,26 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
+		new Setting(containerEl)
+			.setName('Daily Note Template Path')
+			.setDesc('Optional: path to template for new Daily Notes')
+			.addText(text => text
+				.setValue(this.plugin.settings.dailyNoteTemplatePath)
+				.onChange(async (value) => {
+					this.plugin.settings.dailyNoteTemplatePath = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Daily Note Section')
+			.setDesc('Section header to insert tasks into (e.g. ## Tasks)')
+			.addText(text => text
+				.setValue(this.plugin.settings.dailyNoteSection)
+				.onChange(async (value) => {
+					this.plugin.settings.dailyNoteSection = value;
+					await this.plugin.saveSettings();
+				}));
+
 		containerEl.createEl('h3', { text: 'Sync Behavior' });
 
 		new Setting(containerEl)

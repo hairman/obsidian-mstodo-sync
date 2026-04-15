@@ -314,13 +314,39 @@ export class SyncEngine {
 					await this.app.vault.createFolder(folderPath);
 				}
 			}
-			file = await this.app.vault.create(path, `# Daily Note ${date.format('YYYY-MM-DD')}\n\n## Tasks\n`);
+
+			let content = `# Daily Note ${date.format('YYYY-MM-DD')}\n\n${this.settings.dailyNoteSection}\n`;
+			
+			// Пытаемся использовать шаблон, если он настроен
+			if (this.settings.dailyNoteTemplatePath) {
+				const templateFile = this.app.vault.getAbstractFileByPath(this.settings.dailyNoteTemplatePath);
+				if (templateFile instanceof TFile) {
+					content = await this.app.vault.read(templateFile);
+					// Простая замена даты, если есть плейсхолдеры (как в Templater/Daily Notes)
+					content = content.replace(/{{date}}|{{TITLE}}/g, date.format('YYYY-MM-DD'));
+				}
+			}
+			
+			file = await this.app.vault.create(path, content);
 		}
 
 		if (file instanceof TFile) {
 			const status = completed ? 'x' : ' ';
-			const line = `\n- [${status}] ${title} [[${taskFilePath}|↗]] ^${blockId}`;
-			await this.app.vault.append(file, line);
+			const newTaskLine = `- [${status}] ${title} [[${taskFilePath}|↗]] ^${blockId}`;
+			
+			let content = await this.app.vault.read(file);
+			const section = this.settings.dailyNoteSection;
+			
+			if (section && content.includes(section)) {
+				// Вставляем после заголовка раздела
+				const lines = content.split('\n');
+				const sectionIndex = lines.findIndex(l => l.includes(section));
+				lines.splice(sectionIndex + 1, 0, newTaskLine);
+				await this.app.vault.modify(file, lines.join('\n'));
+			} else {
+				// Если раздел не найден, просто добавляем в конец
+				await this.app.vault.append(file, `\n${newTaskLine}`);
+			}
 		}
 	}
 
