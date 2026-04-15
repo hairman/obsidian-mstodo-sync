@@ -13,12 +13,12 @@ export class AuthManager {
 		const expiresAt = this.settings.tokenExpiresAt;
 
 		// Если токен еще валиден (с запасом 5 минут)
-		if (expiresAt && expiresAt - now > 5 * 60 * 1000) {
-			return (this.app as any).secretStorage.get(this.settings.accessTokenSecretName);
+		if (expiresAt && expiresAt - now > 5 * 60 * 1000 && this.settings.accessToken) {
+			return this.settings.accessToken;
 		}
 
 		// Если токен истек, пробуем обновить через Refresh Token
-		const refreshToken = (this.app as any).secretStorage.get(this.settings.refreshTokenSecretName);
+		const refreshToken = this.settings.refreshToken;
 		if (refreshToken) {
 			try {
 				const tokens = await this.refreshAccessToken(refreshToken);
@@ -95,12 +95,11 @@ export class AuthManager {
 	}
 
 	private async storeTokens(tokens: TokenResponse): Promise<void> {
-		(this.app as any).secretStorage.set(this.settings.accessTokenSecretName, tokens.access_token);
+		this.settings.accessToken = tokens.access_token;
 		if (tokens.refresh_token) {
-			(this.app as any).secretStorage.set(this.settings.refreshTokenSecretName, tokens.refresh_token);
+			this.settings.refreshToken = tokens.refresh_token;
 		}
 		this.settings.tokenExpiresAt = Date.now() + (tokens.expires_in * 1000);
-		// saveSettings() будет вызван в main.ts после вызова этой функции
 	}
 
 

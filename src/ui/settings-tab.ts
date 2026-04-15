@@ -25,30 +25,30 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		new Setting(containerEl)
-			.setName('Access Token Secret Name')
-			.setDesc('Name of the secret in SecretStorage for the access token')
-			.addComponent(el => {
-				const sc = new (obsidian as any).SecretComponent(this.app, el);
-				sc.setValue(this.plugin.settings.accessTokenSecretName)
-				  .onChange(async (value: string) => {
-					this.plugin.settings.accessTokenSecretName = value;
+		const statusSetting = new Setting(containerEl)
+			.setName('Login Status');
+		
+		if (this.plugin.settings.accessToken) {
+			statusSetting.setDesc('Connected to Microsoft account');
+			statusSetting.addButton(button => button
+				.setButtonText('Logout')
+				.onClick(async () => {
+					this.plugin.settings.accessToken = '';
+					this.plugin.settings.refreshToken = '';
+					this.plugin.settings.tokenExpiresAt = 0;
 					await this.plugin.saveSettings();
-				  });
-				return sc;
-			});
-
-		new Setting(containerEl)
-			.setName('Refresh Token Secret Name')
-			.addComponent(el => {
-				const sc = new (obsidian as any).SecretComponent(this.app, el);
-				sc.setValue(this.plugin.settings.refreshTokenSecretName)
-				  .onChange(async (value: string) => {
-					this.plugin.settings.refreshTokenSecretName = value;
-					await this.plugin.saveSettings();
-				  });
-				return sc;
-			});
+					this.display();
+					new Notice('Logged out successfully');
+				}));
+		} else {
+			statusSetting.setDesc('Not connected');
+			statusSetting.addButton(button => button
+				.setButtonText('Login')
+				.setWarning()
+				.onClick(async () => {
+					(this.plugin.app as any).commands.executeCommandById('obsidian-mstodo-sync-v2:login');
+				}));
+		}
 
 		containerEl.createEl('h3', { text: 'Sync Targets' });
 

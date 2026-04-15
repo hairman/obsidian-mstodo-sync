@@ -12,10 +12,11 @@ export interface MsTodoSyncSettings {
 	dryRunMode: boolean;
 	deltaToken: string;
 	
-	// Secret names for SecretStorage
-	accessTokenSecretName: string;
-	refreshTokenSecretName: string;
+	// Auth storage
+	accessToken?: string;
+	refreshToken?: string;
 	tokenExpiresAt: number;
+	pkceVerifier?: string;
 }
 
 export interface TaskFrontMatter {

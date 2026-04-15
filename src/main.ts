@@ -13,7 +13,6 @@ export default class MsTodoSyncPlugin extends Plugin {
 	graphClient: GraphClient;
 	fileManager: ObsidianFileManager;
 	syncEngine: SyncEngine;
-	private pkceVerifier: string;
 
 	async onload() {
 		await this.loadSettings();
@@ -25,15 +24,39 @@ export default class MsTodoSyncPlugin extends Plugin {
 
 		// Регистрация хендлера протокола для авторизации
 		this.registerObsidianProtocolHandler('mstodo-sync-auth', async (data: ObsidianProtocolData) => {
+			console.log('[MsTodoSync] Received auth callback data:', data);
+			
 			if (data.code) {
+				new Notice('Connecting to Microsoft...');
 				try {
-					await this.auth.exchangeCodeForToken(data.code, this.pkceVerifier);
+					const verifier = this.settings.pkceVerifier;
+					console.log('[MsTodoSync] Using verifier from settings:', verifier ? 'found' : 'missing');
+					
+					if (!verifier) {
+						throw new Error('No PKCE verifier found in settings. Please try logging in again.');
+					}
+
+					await this.auth.exchangeCodeForToken(data.code, verifier);
+					
+					// Очищаем верификатор
+					this.settings.pkceVerifier = ''; 
 					await this.saveSettings();
+					
 					new Notice('Successfully connected to Microsoft To Do!');
+					
+					// Если есть открытая вкладка настроек, обновляем её
+					this.app.workspace.getLeavesOfType('mstodo-sync-settings').forEach(leaf => {
+						if (leaf.view instanceof MsTodoSyncSettingTab) {
+							(leaf.view as any).display();
+						}
+					});
 				} catch (e) {
-					console.error('[MsTodoSync] Auth error:', e);
-					new Notice('Failed to connect to Microsoft To Do');
+					console.error('[MsTodoSync] Auth exchange error:', e);
+					new Notice(`Failed to connect: ${e.message}`);
 				}
+			} else if (data.error) {
+				console.error('[MsTodoSync] Microsoft returned error:', data.error, data.error_description);
+				new Notice(`Auth error: ${data.error_description || data.error}`);
 			}
 		});
 
@@ -48,12 +71,18 @@ export default class MsTodoSyncPlugin extends Plugin {
 			id: 'login',
 			name: 'Login / Connect Microsoft account',
 			callback: async () => {
-				if (this.settings.clientId === 'YOUR_CLIENT_ID') {
+				if (this.settings.clientId === 'YOUR_CLIENT_ID' || !this.settings.clientId) {
 					new Notice('Please set your Client ID in settings first');
 					return;
 				}
-				this.pkceVerifier = this.auth.generateVerifier();
-				const url = await this.auth.generateAuthUrl(this.pkceVerifier);
+				
+				const verifier = this.auth.generateVerifier();
+				this.settings.pkceVerifier = verifier;
+				await this.saveSettings();
+				
+				console.log('[MsTodoSync] Starting login flow. Verifier saved.');
+				
+				const url = await this.auth.generateAuthUrl(verifier);
 				window.open(url);
 			}
 		});
@@ -62,9 +91,10 @@ export default class MsTodoSyncPlugin extends Plugin {
 			id: 'disconnect',
 			name: 'Disconnect account',
 			callback: async () => {
-				(this.app as any).secretStorage.delete(this.settings.accessTokenSecretName);
-				(this.app as any).secretStorage.delete(this.settings.refreshTokenSecretName);
+				this.settings.accessToken = '';
+				this.settings.refreshToken = '';
 				this.settings.tokenExpiresAt = 0;
+				this.settings.pkceVerifier = '';
 				await this.saveSettings();
 				new Notice('Disconnected from Microsoft To Do');
 			}
