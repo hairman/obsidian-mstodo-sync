@@ -1,0 +1,75 @@
+{
+  "settings": {
+    "title": "MS To Do Sync Settings",
+    "auth": {
+      "header": "Authentication",
+      "clientId": "Microsoft Client ID",
+      "clientIdDesc": "Your Azure Application Client ID",
+      "status": "Login Status",
+      "connected": "Connected to Microsoft account",
+      "notConnected": "Not connected",
+      "login": "Login",
+      "logout": "Logout",
+      "logoutSuccess": "Logged out successfully",
+      "missingClientId": "Please set your Client ID in settings first"
+    },
+    "targets": {
+      "header": "Sync Targets",
+      "todoList": "Default Todo List",
+      "todoListDesc": "MS To Do List to sync with",
+      "todoListLoading": "Loading...",
+      "todoListSelect": "Select a list",
+      "todoListError": "Error loading lists",
+      "notesFolder": "Task Notes Folder",
+      "notesFolderDesc": "Folder where individual task notes will be stored",
+      "dailyNoteFolder": "Daily Note Folder",
+      "dailyNoteFolderDesc": "Path where your daily notes are stored",
+      "filenamePattern": "Daily Note Filename Pattern",
+      "filenamePatternDesc": "Moment.js pattern (e.g. YYYY-MM-DD)",
+      "templatePath": "Daily Note Template Path",
+      "templatePathDesc": "Optional: path to template for new Daily Notes",
+      "section": "Daily Note Section",
+      "sectionDesc": "Section header to insert tasks into (e.g. ## Tasks)"
+    },
+    "behavior": {
+      "header": "Sync Behavior",
+      "interval": "Sync Interval (Minutes)",
+      "intervalDesc": "How often to sync automatically. Set to 0 to disable.",
+      "conflict": "Conflict Strategy",
+      "conflictOptions": {
+        "remote": "Remote Wins",
+        "local": "Local Wins",
+        "newest": "Newest Wins"
+      },
+      "tag": "Sync Tag",
+      "tagDesc": "Only tasks with this tag will be synced"
+    }
+  },
+  "commands": {
+    "syncNow": "Sync now",
+    "login": "Login / Connect Microsoft account",
+    "disconnect": "Disconnect account"
+  },
+  "notices": {
+    "syncing": "Syncing with Microsoft To Do...",
+    "syncComplete": "Sync completed successfully!",
+    "syncNoChanges": "Sync completed. No changes found.",
+    "syncFailed": "Sync failed: {{error}}",
+    "selectList": "Please select a default Todo List in settings",
+    "authSuccess": "Successfully connected to Microsoft To Do!",
+    "authError": "Failed to connect: {{error}}",
+    "connecting": "Connecting to Microsoft...",
+    "noVerifier": "No PKCE verifier found. Please try logging in again.",
+    "disconnected": "Disconnected from Microsoft To Do",
+    "summary": {
+      "sent": "+ {{count}} tasks sent to MS To Do",
+      "updatedRemote": "↑ {{count}} tasks updated in MS To Do",
+      "imported": "+ {{count}} tasks imported to Obsidian",
+      "updatedLocal": "↑ {{count}} tasks updated in Obsidian",
+      "conflicts": "⚠ {{count}} conflicts resolved"
+    }
+  },
+  "ribbon": {
+    "tooltip": "Sync with Microsoft To Do"
+  }
+}

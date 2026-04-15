@@ -2,6 +2,7 @@ import { App, Notice, TFile, moment, TFolder } from 'obsidian';
 import { MsTodoSyncSettings, TaskFrontMatter, GraphTask } from '../interfaces';
 import { ObsidianFileManager } from '../obsidian/file-manager';
 import { GraphClient } from '../api/graph-client';
+import { t } from '../i18n/helpers';
 
 export class SyncEngine {
 	private stats = {
@@ -23,11 +24,11 @@ export class SyncEngine {
 		this.resetStats();
 		try {
 			if (!this.settings.defaultTodoListId) {
-				new Notice('Please select a default Todo List in settings');
+				new Notice(t('notices.selectList'));
 				return;
 			}
 
-			new Notice('Syncing with Microsoft To Do...');
+			new Notice(t('notices.syncing'));
 
 			// 1. Pre-sync: сканируем локальные изменения
 			await this.preSyncLocalScan();
@@ -44,7 +45,7 @@ export class SyncEngine {
 			this.showSyncSummary();
 		} catch (e) {
 			console.error('[MsTodoSync] Sync error:', e);
-			new Notice(`Sync failed: ${e.message}`);
+			new Notice(t('notices.syncFailed', { error: e.message }));
 		}
 	}
 
@@ -54,16 +55,18 @@ export class SyncEngine {
 
 	private showSyncSummary() {
 		const { created, updated, remoteCreated, remoteUpdated, conflicts } = this.stats;
-		let message = 'Sync completed successfully!\n';
-		if (remoteCreated > 0) message += `+ ${remoteCreated} tasks sent to MS To Do\n`;
-		if (remoteUpdated > 0) message += `↑ ${remoteUpdated} tasks updated in MS To Do\n`;
-		if (created > 0) message += `+ ${created} tasks imported to Obsidian\n`;
-		if (updated > 0) message += `↑ ${updated} tasks updated in Obsidian\n`;
-		if (conflicts > 0) message += `⚠ ${conflicts} conflicts resolved\n`;
 		
 		if (created === 0 && updated === 0 && remoteCreated === 0 && remoteUpdated === 0) {
-			message = 'Sync completed. No changes found.';
+			new Notice(t('notices.syncNoChanges'));
+			return;
 		}
+
+		let message = t('notices.syncComplete') + '\n';
+		if (remoteCreated > 0) message += t('notices.summary.sent', { count: String(remoteCreated) }) + '\n';
+		if (remoteUpdated > 0) message += t('notices.summary.updatedRemote', { count: String(remoteUpdated) }) + '\n';
+		if (created > 0) message += t('notices.summary.imported', { count: String(created) }) + '\n';
+		if (updated > 0) message += t('notices.summary.updatedLocal', { count: String(updated) }) + '\n';
+		if (conflicts > 0) message += t('notices.summary.conflicts', { count: String(conflicts) }) + '\n';
 
 		new Notice(message, 5000);
 	}
@@ -280,7 +283,7 @@ export class SyncEngine {
 	private async createNewLocalTask(remote: GraphTask) {
 		const blockId = this.fileManager.generateBlockId();
 		// Используем дату создания задачи для определения Daily Note
-		const createdDate = moment(remote.createdDateTime);
+		const createdDate = (window as any).moment(remote.createdDateTime);
 		const dailyNotePath = this.getDailyNotePath(createdDate);
 		
 		const metadata: TaskFrontMatter = {

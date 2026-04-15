@@ -1,0 +1,75 @@
+{
+  "settings": {
+    "title": "Настройки синхронизации MS To Do",
+    "auth": {
+      "header": "Авторизация",
+      "clientId": "Microsoft Client ID",
+      "clientIdDesc": "ID клиента вашего приложения в Azure",
+      "status": "Статус входа",
+      "connected": "Подключено к аккаунту Microsoft",
+      "notConnected": "Не подключено",
+      "login": "Войти",
+      "logout": "Выйти",
+      "logoutSuccess": "Успешный выход",
+      "missingClientId": "Сначала укажите Client ID в настройках"
+    },
+    "targets": {
+      "header": "Цели синхронизации",
+      "todoList": "Список задач по умолчанию",
+      "todoListDesc": "Список задач MS To Do для синхронизации",
+      "todoListLoading": "Загрузка...",
+      "todoListSelect": "Выберите список",
+      "todoListError": "Ошибка загрузки списков",
+      "notesFolder": "Папка для заметок задач",
+      "notesFolderDesc": "Папка, где будут храниться отдельные заметки задач",
+      "dailyNoteFolder": "Папка ежедневных заметок",
+      "dailyNoteFolderDesc": "Путь к вашим ежедневным заметкам",
+      "filenamePattern": "Шаблон имени ежедневной заметки",
+      "filenamePatternDesc": "Шаблон Moment.js (например, YYYY-MM-DD)",
+      "templatePath": "Путь к шаблону ежедневной заметки",
+      "templatePathDesc": "Опционально: путь к шаблону для новых ежедневных заметок",
+      "section": "Секция ежедневной заметки",
+      "sectionDesc": "Заголовок секции для вставки задач (например, ## Задачи)"
+    },
+    "behavior": {
+      "header": "Поведение синхронизации",
+      "interval": "Интервал синхронизации (мин)",
+      "intervalDesc": "Как часто синхронизировать автоматически. Установите 0 для отключения.",
+      "conflict": "Стратегия конфликтов",
+      "conflictOptions": {
+        "remote": "Удаленный выигрывает",
+        "local": "Локальный выигрывает",
+        "newest": "Новейший выигрывает"
+      },
+      "tag": "Тег синхронизации",
+      "tagDesc": "Будут синхронизированы только задачи с этим тегом"
+    }
+  },
+  "commands": {
+    "syncNow": "Синхронизировать сейчас",
+    "login": "Войти / Подключить аккаунт Microsoft",
+    "disconnect": "Отключить аккаунт"
+  },
+  "notices": {
+    "syncing": "Синхронизация с Microsoft To Do...",
+    "syncComplete": "Синхронизация успешно завершена!",
+    "syncNoChanges": "Синхронизация завершена. Изменений не найдено.",
+    "syncFailed": "Ошибка синхронизации: {{error}}",
+    "selectList": "Пожалуйста, выберите список задач в настройках",
+    "authSuccess": "Успешно подключено к Microsoft To Do!",
+    "authError": "Ошибка подключения: {{error}}",
+    "connecting": "Подключение к Microsoft...",
+    "noVerifier": "Верификатор PKCE не найден. Попробуйте войти снова.",
+    "disconnected": "Отключено от Microsoft To Do",
+    "summary": {
+      "sent": "+ {{count}} задач отправлено в MS To Do",
+      "updatedRemote": "↑ {{count}} задач обновлено в MS To Do",
+      "imported": "+ {{count}} задач импортировано в Obsidian",
+      "updatedLocal": "↑ {{count}} задач обновлено в Obsidian",
+      "conflicts": "⚠ {{count}} конфликтов разрешено"
+    }
+  },
+  "ribbon": {
+    "tooltip": "Синхронизировать с Microsoft To Do"
+  }
+}
