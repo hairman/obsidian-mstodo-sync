@@ -1,9 +1,17 @@
-import { App, Notice, TFile, moment } from 'obsidian';
+import { App, Notice, TFile, moment, TFolder } from 'obsidian';
 import { MsTodoSyncSettings, TaskFrontMatter, GraphTask } from '../interfaces';
 import { ObsidianFileManager } from '../obsidian/file-manager';
 import { GraphClient } from '../api/graph-client';
 
 export class SyncEngine {
+	private stats = {
+		created: 0,
+		updated: 0,
+		remoteCreated: 0,
+		remoteUpdated: 0,
+		conflicts: 0
+	};
+
 	constructor(
 		private app: App,
 		private settings: MsTodoSyncSettings,
@@ -12,6 +20,7 @@ export class SyncEngine {
 	) {}
 
 	async runSync() {
+		this.resetStats();
 		try {
 			if (!this.settings.defaultTodoListId) {
 				new Notice('Please select a default Todo List in settings');
@@ -20,8 +29,11 @@ export class SyncEngine {
 
 			new Notice('Syncing with Microsoft To Do...');
 
-			// 1. Pre-sync: сканируем локальные изменения в Daily Notes
+			// 1. Pre-sync: сканируем локальные изменения
 			await this.preSyncLocalScan();
+			
+			// Дополнительно сканируем ежедневные заметки на наличие новых задач с тегом
+			await this.scanDailyNotesForNewTasks();
 
 			// 2. Import: получаем изменения из MS To Do
 			await this.importFromRemote();
@@ -29,11 +41,31 @@ export class SyncEngine {
 			// 3. Export: отправляем локальные изменения в MS To Do
 			await this.exportToRemote();
 
-			new Notice('Sync completed successfully!');
+			this.showSyncSummary();
 		} catch (e) {
 			console.error('[MsTodoSync] Sync error:', e);
 			new Notice(`Sync failed: ${e.message}`);
 		}
+	}
+
+	private resetStats() {
+		this.stats = { created: 0, updated: 0, remoteCreated: 0, remoteUpdated: 0, conflicts: 0 };
+	}
+
+	private showSyncSummary() {
+		const { created, updated, remoteCreated, remoteUpdated, conflicts } = this.stats;
+		let message = 'Sync completed successfully!\n';
+		if (remoteCreated > 0) message += `+ ${remoteCreated} tasks sent to MS To Do\n`;
+		if (remoteUpdated > 0) message += `↑ ${remoteUpdated} tasks updated in MS To Do\n`;
+		if (created > 0) message += `+ ${created} tasks imported to Obsidian\n`;
+		if (updated > 0) message += `↑ ${updated} tasks updated in Obsidian\n`;
+		if (conflicts > 0) message += `⚠ ${conflicts} conflicts resolved\n`;
+		
+		if (created === 0 && updated === 0 && remoteCreated === 0 && remoteUpdated === 0) {
+			message = 'Sync completed. No changes found.';
+		}
+
+		new Notice(message, 5000);
 	}
 
 	/**
@@ -67,6 +99,63 @@ export class SyncEngine {
 	}
 
 	/**
+	 * Ищет новые задачи с тегом в ежедневных заметках.
+	 */
+	private async scanDailyNotesForNewTasks() {
+		const dailyNotesFolder = this.app.vault.getAbstractFileByPath(this.settings.dailyNoteFolder);
+		if (!(dailyNotesFolder instanceof TFolder)) return;
+
+		const files = dailyNotesFolder.children.filter(f => f instanceof TFile && f.extension === 'md') as TFile[];
+		const syncTag = this.settings.syncTag;
+		
+		for (const file of files) {
+			const content = await this.app.vault.read(file);
+			const lines = content.split('\n');
+			let changed = false;
+			const newLines = [...lines];
+
+			for (let i = 0; i < lines.length; i++) {
+				const line = lines[i];
+				// Ищем строки вида: - [ ] Задача #tag (без ^blockId на конце)
+				if (line.includes(syncTag) && line.trim().startsWith('- [') && !line.includes(' ^')) {
+					const match = line.match(/- \[([ xX])\]\s*(.*?)\s*(#\S+)/);
+					if (match) {
+						const completed = match[1].toLowerCase() === 'x';
+						const title = match[2].trim();
+						const blockId = this.fileManager.generateBlockId();
+						
+						// Создаем локальный файл задачи без msTodoId (он появится после экспорта)
+						const metadata: TaskFrontMatter = {
+							msTodoId: '',
+							msTodoListId: this.settings.defaultTodoListId,
+							msTodoEtag: '',
+							msTodoLastModifiedDateTime: '',
+							msTodoSyncStatus: 'pending',
+							sourceDailyNotePath: file.path,
+							sourceBlockId: blockId,
+							syncTag: syncTag,
+							localCompleted: completed,
+							lastSyncedCompleted: false,
+							localUpdatedAt: Date.now()
+						};
+
+						await this.fileManager.createTaskFile(this.settings.taskNotesFolder, title, metadata);
+						
+						// Обновляем строку в Daily Note, добавляя blockId
+						newLines[i] = `${line.trim()} ^${blockId}`;
+						changed = true;
+						this.stats.remoteCreated++; // Предварительно считаем как создаваемую удаленно
+					}
+				}
+			}
+
+			if (changed) {
+				await this.app.vault.modify(file, newLines.join('\n'));
+			}
+		}
+	}
+
+	/**
 	 * Импорт изменений из MS To Do (Delta Sync).
 	 */
 	private async importFromRemote() {
@@ -74,7 +163,6 @@ export class SyncEngine {
 		
 		for (const remoteTask of result.value) {
 			const localFile = await this.fileManager.findTaskFileById(remoteTask.id, this.settings.taskNotesFolder);
-			const remoteCompleted = remoteTask.status === 'completed';
 
 			if (localFile) {
 				const fm = this.app.metadataCache.getFileCache(localFile)?.frontmatter as TaskFrontMatter;
@@ -85,13 +173,16 @@ export class SyncEngine {
 
 				if (isModifiedLocally && isModifiedRemotely) {
 					await this.resolveConflict(localFile, fm, remoteTask);
+					this.stats.conflicts++;
 				} else if (isModifiedRemotely) {
 					// Просто обновляем локальную версию
 					await this.applyRemoteUpdate(localFile, fm, remoteTask);
+					this.stats.updated++;
 				}
-			} else {
+			} else if (remoteTask.status !== 'deleted') { // Graph API может возвращать удаленные
 				// Создаем новую задачу локально, если её еще нет
 				await this.createNewLocalTask(remoteTask);
+				this.stats.created++;
 			}
 		}
 
@@ -106,23 +197,48 @@ export class SyncEngine {
 	 */
 	private async exportToRemote() {
 		const taskFiles = this.getTaskFiles();
+		const currentRemoteCreated = this.stats.remoteCreated;
+		this.stats.remoteCreated = 0; // Сбрасываем счетчик для точного подсчета
+
 		for (const file of taskFiles) {
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter as TaskFrontMatter;
 			if (!fm || fm.msTodoSyncStatus !== 'pending') continue;
 
-			if (fm.msTodoId) {
-				// Обновление существующей задачи
-				const remoteTask = await this.graphClient.updateTask(this.settings.defaultTodoListId, fm.msTodoId, {
-					status: fm.localCompleted ? 'completed' : 'notStarted'
-				});
-				await this.fileManager.updateTaskMetadata(file, {
-					msTodoEtag: remoteTask['@odata.etag'],
-					lastSyncedCompleted: fm.localCompleted,
-					msTodoSyncStatus: 'synced'
-				});
-			} else {
-				// Здесь должна быть логика создания новой задачи в MS To Do из локальной заметки
-				// (пока не реализовано в этом прототипе для краткости)
+			try {
+				if (fm.msTodoId) {
+					// Обновление существующей задачи
+					const remoteTask = await this.graphClient.updateTask(this.settings.defaultTodoListId, fm.msTodoId, {
+						status: fm.localCompleted ? 'completed' : 'notStarted'
+					});
+					await this.fileManager.updateTaskMetadata(file, {
+						msTodoEtag: remoteTask['@odata.etag'],
+						lastSyncedCompleted: fm.localCompleted,
+						msTodoSyncStatus: 'synced'
+					});
+					this.stats.remoteUpdated++;
+				} else {
+					// Создание новой задачи в MS To Do
+					const title = file.basename;
+					const remoteTask = await this.graphClient.createTask(this.settings.defaultTodoListId, title);
+					
+					// Если в Obsidian она была помечена как выполненная, обновляем статус в MS To Do сразу
+					if (fm.localCompleted) {
+						await this.graphClient.updateTask(this.settings.defaultTodoListId, remoteTask.id, {
+							status: 'completed'
+						});
+					}
+
+					await this.fileManager.updateTaskMetadata(file, {
+						msTodoId: remoteTask.id,
+						msTodoEtag: remoteTask['@odata.etag'],
+						msTodoLastModifiedDateTime: remoteTask.lastModifiedDateTime,
+						lastSyncedCompleted: fm.localCompleted,
+						msTodoSyncStatus: 'synced'
+					});
+					this.stats.remoteCreated++;
+				}
+			} catch (e) {
+				console.error(`[MsTodoSync] Failed to export task ${file.path}:`, e);
 			}
 		}
 	}
@@ -151,7 +267,6 @@ export class SyncEngine {
 		}
 
 		if (winRemote) {
-			// Бекапим локальную версию перед перезаписью (опционально)
 			await this.applyRemoteUpdate(file, fm, remote);
 		} else {
 			// Локальная версия побеждает — пометим как pending для экспорта
@@ -186,6 +301,14 @@ export class SyncEngine {
 	private async appendToDailyNote(path: string, title: string, taskFilePath: string, blockId: string, completed: boolean) {
 		let file = this.app.vault.getAbstractFileByPath(path);
 		if (!file && this.settings.createDailyNoteIfMissing) {
+			// Нормализуем путь для создания
+			const parts = path.split('/');
+			if (parts.length > 1) {
+				const folderPath = parts.slice(0, -1).join('/');
+				if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+					await this.app.vault.createFolder(folderPath);
+				}
+			}
 			file = await this.app.vault.create(path, `# Daily Note ${moment().format('YYYY-MM-DD')}\n\n## Tasks\n`);
 		}
 
@@ -203,6 +326,9 @@ export class SyncEngine {
 	}
 
 	private getTaskFiles(): TFile[] {
+		const folder = this.app.vault.getAbstractFileByPath(this.settings.taskNotesFolder);
+		if (!(folder instanceof TFolder)) return [];
+		
 		return this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(this.settings.taskNotesFolder));
 	}
 }

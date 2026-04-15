@@ -36,7 +36,7 @@ export interface TaskFrontMatter {
 export interface GraphTask {
 	id: string;
 	title: string;
-	status: 'notStarted' | 'completed';
+	status: 'notStarted' | 'completed' | 'deleted';
 	lastModifiedDateTime: string;
 	body?: {
 		content: string;
