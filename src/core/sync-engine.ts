@@ -279,7 +279,9 @@ export class SyncEngine {
 
 	private async createNewLocalTask(remote: GraphTask) {
 		const blockId = this.fileManager.generateBlockId();
-		const dailyNotePath = this.getDailyNotePath(moment()); // Для новых задач берем сегодня
+		// Используем дату создания задачи для определения Daily Note
+		const createdDate = moment(remote.createdDateTime);
+		const dailyNotePath = this.getDailyNotePath(createdDate);
 		
 		const metadata: TaskFrontMatter = {
 			msTodoId: remote.id,
@@ -297,11 +299,11 @@ export class SyncEngine {
 
 		const file = await this.fileManager.createTaskFile(this.settings.taskNotesFolder, remote.title, metadata);
 		
-		// Добавляем чекбокс в Daily Note
-		await this.appendToDailyNote(dailyNotePath, remote.title, file.path, blockId, metadata.localCompleted);
+		// Добавляем чекбокс в Daily Note соответствующего дня
+		await this.appendToDailyNote(dailyNotePath, remote.title, file.path, blockId, metadata.localCompleted, createdDate);
 	}
 
-	private async appendToDailyNote(path: string, title: string, taskFilePath: string, blockId: string, completed: boolean) {
+	private async appendToDailyNote(path: string, title: string, taskFilePath: string, blockId: string, completed: boolean, date: moment.Moment) {
 		let file = this.app.vault.getAbstractFileByPath(path);
 		if (!file && this.settings.createDailyNoteIfMissing) {
 			// Нормализуем путь для создания
@@ -312,7 +314,7 @@ export class SyncEngine {
 					await this.app.vault.createFolder(folderPath);
 				}
 			}
-			file = await this.app.vault.create(path, `# Daily Note ${moment().format('YYYY-MM-DD')}\n\n## Tasks\n`);
+			file = await this.app.vault.create(path, `# Daily Note ${date.format('YYYY-MM-DD')}\n\n## Tasks\n`);
 		}
 
 		if (file instanceof TFile) {

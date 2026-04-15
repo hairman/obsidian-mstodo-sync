@@ -38,6 +38,7 @@ export interface GraphTask {
 	title: string;
 	status: 'notStarted' | 'completed' | 'deleted';
 	lastModifiedDateTime: string;
+	createdDateTime: string;
 	body?: {
 		content: string;
 		contentType: 'text' | 'html';
