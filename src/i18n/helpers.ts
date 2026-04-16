@@ -12,7 +12,7 @@ const locales: { [key: string]: any } = {
  * Поддерживает вложенность через точку.
  */
 export function t(path: string, vars?: { [key: string]: string }): string {
-    const lang = (window as any).moment.locale();
+    const lang = moment.locale();
     const locale = locales[lang] || locales['en'];
     
     const value = path.split('.').reduce((obj, key) => obj?.[key], locale);

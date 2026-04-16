@@ -47,7 +47,7 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 				.setButtonText(t('settings.auth.login'))
 				.setWarning()
 				.onClick(async () => {
-					(this.plugin.app as any).commands.executeCommandById('obsidian-mstodo-sync-v2:login');
+					(this.plugin.app as any).commands.executeCommandById('microsoft-to-do-sync:login');
 				}));
 		}
 

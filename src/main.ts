@@ -119,6 +119,10 @@ export default class MsTodoSyncPlugin extends Plugin {
 		this.addSettingTab(new MsTodoSyncSettingTab(this.app, this));
 	}
 
+	async onunload() {
+		console.log('[MsTodoSync] Unloading plugin');
+	}
+
 	private setupAutoSync() {
 		if (this.settings.syncIntervalMinutes > 0) {
 			this.registerInterval(

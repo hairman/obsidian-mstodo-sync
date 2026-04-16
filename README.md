@@ -48,5 +48,13 @@ An advanced two-way synchronization plugin for [Obsidian](https://obsidian.md) t
 ## 🛡️ Support
 If you encounter any issues or have feature requests, please check the [GitHub Issues](https://github.com/hairman/obsidian-mstodo-sync/issues).
 
+## 🔒 Privacy & Data Security
+
+This plugin connects directly to the **Microsoft Graph API**. 
+- **Data Transfer**: Only your tasks and necessary metadata (like IDs and etags) are sent to Microsoft servers.
+- **Authentication**: Authentication is handled via OAuth2 with PKCE. Your credentials (password) are never seen or stored by the plugin.
+- **Local Storage**: Access tokens are stored locally within your vault's plugin settings (`data.json`).
+- **Telemetry**: The plugin does not collect or send any telemetry or usage data to the author or any third party.
+
 ## 📄 License
 [MIT License](LICENSE)
