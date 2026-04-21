@@ -3,7 +3,7 @@
   "name": "Microsoft To Do Sync",
   "version": "1.0.0",
   "minAppVersion": "1.1.0",
-  "description": "Two-way sync with Microsoft To Do",
+  "description": "Two-way sync with Microsoft To Do.",
   "author": "Pavel Markhvida",
   "authorUrl": "https://github.com/hairman",
   "isDesktopOnly": false
