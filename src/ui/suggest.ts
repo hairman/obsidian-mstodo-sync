@@ -27,7 +27,7 @@ export class FileSuggest extends AbstractInputSuggest<TFile> {
 	}
 
 	selectSuggestion(file: TFile): void {
-		console.log(`[MsTodoSync] Selecting file: ${file.path}`);
+		console.debug(`[MsTodoSync] Selecting file: ${file.path}`);
 		if (this.inputEl) {
 			this.inputEl.value = file.path;
 			this.inputEl.dispatchEvent(new Event('input'));
@@ -65,7 +65,7 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	}
 
 	selectSuggestion(folder: TFolder): void {
-		console.log(`[MsTodoSync] Selecting folder: ${folder.path}`);
+		console.debug(`[MsTodoSync] Selecting folder: ${folder.path}`);
 		if (this.inputEl) {
 			this.inputEl.value = folder.path;
 			this.inputEl.dispatchEvent(new Event('input'));

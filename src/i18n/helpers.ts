@@ -2,9 +2,9 @@ import { moment } from 'obsidian';
 import en from './locales/en.json';
 import ru from './locales/ru.json';
 
-const locales: { [key: string]: any } = {
-    en,
-    ru,
+const locales: { [key: string]: Record<string, unknown> } = {
+    en: en as Record<string, unknown>,
+    ru: ru as Record<string, unknown>,
 };
 
 /**
@@ -15,9 +15,9 @@ export function t(path: string, vars?: { [key: string]: string }): string {
     const lang = moment.locale();
     const locale = locales[lang] || locales['en'];
     
-    const value = path.split('.').reduce((obj, key) => obj?.[key], locale);
+    const value = path.split('.').reduce((obj: any, key) => obj?.[key], locale);
     
-    if (!value) {
+    if (!value || typeof value !== 'string') {
         console.warn(`[MsTodoSync] Translation missing for key: ${path}`);
         return path;
     }

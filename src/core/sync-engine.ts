@@ -1,16 +1,18 @@
-import { App, Notice, TFile, TFolder, normalizePath, moment } from 'obsidian';
-import { MsTodoSyncSettings, TaskFrontMatter, GraphTask } from '../interfaces';
+import { App, TFile, Notice, moment, normalizePath } from 'obsidian';
+import { MsTodoSyncSettings, GraphTask, TaskFrontMatter } from '../interfaces';
 import { ObsidianFileManager } from '../obsidian/file-manager';
 import { GraphClient } from '../api/graph-client';
 import { t } from '../i18n/helpers';
 
 export class SyncEngine {
+	private isSyncing = false;
 	private stats = {
 		created: 0,
 		updated: 0,
+		deleted: 0,
+		conflicts: 0,
 		remoteCreated: 0,
-		remoteUpdated: 0,
-		conflicts: 0
+		remoteUpdated: 0
 	};
 
 	constructor(
@@ -21,39 +23,85 @@ export class SyncEngine {
 	) {}
 
 	async runSync() {
-		this.resetStats();
-		try {
-			if (!this.settings.defaultTodoListId) {
-				new Notice(t('notices.selectList'));
-				return;
-			}
-
+		if (this.isSyncing) {
 			new Notice(t('notices.syncing'));
+			return;
+		}
 
-			// 1. Pre-sync: сканируем локальные изменения
+		if (!this.settings.accessToken) {
+			new Notice(t('notices.authError', { error: t('settings.auth.notConnected') }));
+			return;
+		}
+
+		this.isSyncing = true;
+		this.resetStats();
+		new Notice(t('notices.syncing'));
+
+		try {
+			// 1. Предварительное сканирование локальных изменений в Daily Notes
 			await this.preSyncLocalScan();
+
+			// 2. Сбор новых задач из Obsidian (по тегу)
+			await this.collectNewTasksFromObsidian();
 			
-			// Сканируем только файлы с нужным тегом через кэш
-			await this.scanAllNotesForNewTasks();
-
-			// 2. Import: получаем изменения из MS To Do
+			// 3. Получение изменений из Microsoft To Do (Delta Sync)
 			await this.importFromRemote();
-
-			// 3. Export: отправляем локальные изменения в MS To Do
+			
+			// 4. Отправка локальных изменений в Microsoft To Do
 			await this.exportToRemote();
 
-			this.showSyncSummary();
+			this.showSummary();
 		} catch (e) {
 			console.error('[MsTodoSync] Sync error:', e);
-			new Notice(t('notices.syncFailed', { error: e.message }));
+			new Notice(t('notices.syncFailed', { error: (e as Error).message }));
+		} finally {
+			this.isSyncing = false;
+		}
+	}
+
+	/**
+	 * Сканирует все файлы задач и проверяет их состояние в Daily Notes.
+	 * Если состояние изменилось, помечает задачу как 'pending' для экспорта.
+	 */
+	private async preSyncLocalScan() {
+		const taskFiles = this.getTaskFiles();
+		for (const file of taskFiles) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const fm = cache?.frontmatter as TaskFrontMatter | undefined;
+			if (!fm || !fm.sourceDailyNotePath || !fm.sourceBlockId) continue;
+
+			const dailyFile = this.app.vault.getAbstractFileByPath(fm.sourceDailyNotePath);
+			if (dailyFile instanceof TFile) {
+				const content = await this.app.vault.read(dailyFile);
+				const blockRegex = new RegExp(`- \\[([ xX])\\].*\\^${fm.sourceBlockId}`);
+				const match = content.match(blockRegex);
+
+				if (match) {
+					const isCompleted = match[1].toLowerCase() === 'x';
+					if (isCompleted !== fm.localCompleted) {
+						await this.fileManager.updateTaskMetadata(file, {
+							localCompleted: isCompleted,
+							localUpdatedAt: Date.now(),
+							msTodoSyncStatus: 'pending'
+						});
+					}
+				}
+			}
 		}
 	}
 
 	private resetStats() {
-		this.stats = { created: 0, updated: 0, remoteCreated: 0, remoteUpdated: 0, conflicts: 0 };
+		this.stats = {
+			created: 0,
+			updated: 0,
+			deleted: 0,
+			conflicts: 0,
+			remoteCreated: 0,
+			remoteUpdated: 0
+		};
 	}
 
-	private showSyncSummary() {
+	private showSummary() {
 		const { created, updated, remoteCreated, remoteUpdated, conflicts } = this.stats;
 		
 		if (created === 0 && updated === 0 && remoteCreated === 0 && remoteUpdated === 0) {
@@ -69,44 +117,12 @@ export class SyncEngine {
 		if (conflicts > 0) message += t('notices.summary.conflicts', { count: String(conflicts) }) + '\n';
 
 		new Notice(message, 5000);
+		console.debug('[MsTodoSync] Sync complete stats:', this.stats);
 	}
 
-	/**
-	 * Сканирует все файлы задач и проверяет их состояние в Daily Notes.
-	 */
-	private async preSyncLocalScan() {
-		const taskFiles = this.getTaskFiles();
-		for (const file of taskFiles) {
-			const cache = this.app.metadataCache.getFileCache(file);
-			const fm = cache?.frontmatter as TaskFrontMatter;
-			if (!fm || !fm.sourceDailyNotePath || !fm.sourceBlockId) continue;
-
-			const sourceFile = this.app.vault.getAbstractFileByPath(fm.sourceDailyNotePath);
-			if (sourceFile instanceof TFile) {
-				const content = await this.app.vault.read(sourceFile);
-				const blockRegex = new RegExp(`- \\[([ xX])\\].*\\^${fm.sourceBlockId}`);
-				const match = content.match(blockRegex);
-				
-				if (match) {
-					const isCompleted = match[1].toLowerCase() === 'x';
-					if (isCompleted !== fm.localCompleted) {
-						await this.fileManager.updateTaskMetadata(file, {
-							localCompleted: isCompleted,
-							localUpdatedAt: Date.now(),
-							msTodoSyncStatus: 'pending'
-						});
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Ищет новые задачи с тегом через кэш метаданных (высокая производительность).
-	 */
-	private async scanAllNotesForNewTasks() {
-		const syncTag = this.settings.syncTag;
-		const taskNotesFolder = this.settings.taskNotesFolder;
+	private async collectNewTasksFromObsidian() {
+		const { syncTag, taskNotesFolder } = this.settings;
+		if (!syncTag) return;
 		
 		// Используем метаданные вместо чтения всех файлов
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -118,7 +134,7 @@ export class SyncEngine {
 			if (!cache) continue;
 
 			// Проверяем наличие тега в кэше
-			const hasTag = cache.tags?.some(t => t.tag === syncTag) || 
+			const hasTag = cache.tags?.some(tag => tag.tag === syncTag) || 
 						  cache.frontmatter?.tags?.includes(syncTag.replace('#', ''));
 			
 			if (!hasTag) {
@@ -174,7 +190,7 @@ export class SyncEngine {
 		const result = await this.graphClient.getTasksDelta(this.settings.defaultTodoListId, this.settings.deltaToken);
 		
 		for (const remoteTask of result.value) {
-			const localFile = await this.fileManager.findTaskFileById(remoteTask.id, this.settings.taskNotesFolder);
+			const localFile = this.fileManager.findTaskFileById(remoteTask.id, this.settings.taskNotesFolder);
 
 			if (localFile) {
 				const fm = this.app.metadataCache.getFileCache(localFile)?.frontmatter as TaskFrontMatter;
@@ -275,6 +291,7 @@ export class SyncEngine {
 
 	private async createNewLocalTask(remote: GraphTask) {
 		const blockId = this.fileManager.generateBlockId();
+		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 		// @ts-ignore
 		const createdDate = moment(remote.createdDateTime);
 		const dailyNotePath = this.getDailyNotePath(createdDate);
@@ -293,72 +310,57 @@ export class SyncEngine {
 			localUpdatedAt: Date.now()
 		};
 
-		const file = await this.fileManager.createTaskFile(this.settings.taskNotesFolder, remote.title, metadata);
-		await this.appendToDailyNote(dailyNotePath, remote.title, file.path, blockId, metadata.localCompleted, createdDate);
-	}
-
-	private async appendToDailyNote(path: string, title: string, taskFilePath: string, blockId: string, completed: boolean, date: moment.Moment) {
-		let file = this.app.vault.getAbstractFileByPath(path);
-		if (!file && this.settings.createDailyNoteIfMissing) {
-			const parts = path.split('/');
-			if (parts.length > 1) {
-				const folderPath = parts.slice(0, -1).join('/');
-				if (!this.app.vault.getAbstractFileByPath(folderPath)) {
-					await this.app.vault.createFolder(folderPath);
-				}
-			}
-
-			let content = `# Daily Note ${date.format('YYYY-MM-DD')}\n\n${this.settings.dailyNoteSection}\n`;
-			
-			if (this.settings.dailyNoteTemplatePath) {
-				let templatePath = this.settings.dailyNoteTemplatePath;
-				if (!templatePath.endsWith('.md')) {
-					templatePath += '.md';
-				}
-				
-				const normPath = normalizePath(templatePath);
-				const templateFile = this.app.vault.getAbstractFileByPath(normPath);
-				if (templateFile instanceof TFile) {
-					content = await this.app.vault.read(templateFile);
-					content = content.replace(/{{date}}|{{TITLE}}/g, date.format('YYYY-MM-DD'));
-					
-					if (this.settings.dailyNoteSection && !content.includes(this.settings.dailyNoteSection)) {
-						content += `\n\n${this.settings.dailyNoteSection}\n`;
-					}
-				}
-			}
-			
-			file = await this.app.vault.create(path, content);
-		}
-
-		if (file instanceof TFile) {
-			const status = completed ? 'x' : ' ';
-			const newTaskLine = `- [${status}] ${title} [[${taskFilePath}|↗]] ^${blockId}`;
-			
-			await this.app.vault.process(file, (content) => {
-				const section = this.settings.dailyNoteSection;
-				if (section && content.includes(section)) {
-					const lines = content.split('\n');
-					const sectionIndex = lines.findIndex(l => l.includes(section));
-					lines.splice(sectionIndex + 1, 0, newTaskLine);
-					return lines.join('\n');
-				} else {
-					return content + `\n${newTaskLine}`;
-				}
-			});
+		await this.fileManager.createTaskFile(this.settings.taskNotesFolder, remote.title, metadata);
+		
+		if (this.settings.createDailyNoteIfMissing) {
+			await this.addToListInDailyNote(dailyNotePath, blockId, remote.title, remote.status === 'completed');
 		}
 	}
 
 	private getDailyNotePath(date: moment.Moment): string {
 		const folder = this.settings.dailyNoteFolder;
-		const fileName = date.format(this.settings.dailyNoteFilenamePattern);
-		return normalizePath(`${folder}/${fileName}.md`);
+		const filename = date.format(this.settings.dailyNoteFilenamePattern) + '.md';
+		return normalizePath(`${folder}/${filename}`);
+	}
+
+	private async addToListInDailyNote(path: string, blockId: string, title: string, completed: boolean) {
+		const file = this.app.vault.getAbstractFileByPath(path);
+		let content = '';
+		if (file instanceof TFile) {
+			content = await this.app.vault.read(file);
+		} else {
+			// Создаем из шаблона или пустой
+			if (this.settings.dailyNoteTemplatePath) {
+				const templateFile = this.app.vault.getAbstractFileByPath(this.settings.dailyNoteTemplatePath);
+				if (templateFile instanceof TFile) {
+					content = await this.app.vault.read(templateFile);
+				}
+			}
+		}
+
+		const statusChar = completed ? 'x' : ' ';
+		const newTaskLine = `- [${statusChar}] ${title} ${this.settings.syncTag} ^${blockId}`;
+		
+		const section = this.settings.dailyNoteSection;
+		let newContent = '';
+
+		if (content.includes(section)) {
+			newContent = content.replace(section, `${section}\n${newTaskLine}`);
+		} else {
+			newContent = content + `\n\n${section}\n${newTaskLine}`;
+		}
+
+		if (file instanceof TFile) {
+			await this.app.vault.modify(file, newContent);
+		} else {
+			await this.fileManager.ensureFolder(this.settings.dailyNoteFolder);
+			await this.app.vault.create(path, newContent);
+		}
 	}
 
 	private getTaskFiles(): TFile[] {
-		const folder = this.app.vault.getAbstractFileByPath(this.settings.taskNotesFolder);
-		if (!(folder instanceof TFolder)) return [];
-		
-		return this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(this.settings.taskNotesFolder));
+		return this.app.vault.getMarkdownFiles().filter(file => 
+			file.path.startsWith(this.settings.taskNotesFolder)
+		);
 	}
 }

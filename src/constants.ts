@@ -1,9 +1,11 @@
+import { MsTodoSyncSettings } from './interfaces';
+
 export const GRAPH_ENDPOINT = 'https://graph.microsoft.com/v1.0';
 export const AUTH_REDIRECT_URI = 'obsidian://mstodo-sync-auth';
 export const AUTH_TENANT = 'consumers';
 export const AUTH_SCOPES = ['Tasks.ReadWrite', 'offline_access'];
 
-export const DEFAULT_SETTINGS: any = {
+export const DEFAULT_SETTINGS: MsTodoSyncSettings = {
 	taskNotesFolder: 'Tasks/MS-To-Do',
 	dailyNoteFolder: 'Daily',
 	dailyNoteFilenamePattern: 'YYYY-MM-DD',

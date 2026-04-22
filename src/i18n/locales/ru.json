@@ -5,6 +5,7 @@
       "header": "Авторизация",
       "clientId": "Microsoft Client ID",
       "clientIdDesc": "ID клиента вашего приложения в Azure",
+      "clientIdPlaceholder": "Введите Client ID",
       "status": "Статус входа",
       "connected": "Подключено к аккаунту Microsoft",
       "notConnected": "Не подключено",

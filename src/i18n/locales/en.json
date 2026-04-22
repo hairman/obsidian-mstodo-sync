@@ -5,6 +5,7 @@
       "header": "Authentication",
       "clientId": "Microsoft Client ID",
       "clientIdDesc": "Your Azure Application Client ID",
+      "clientIdPlaceholder": "Enter Client ID",
       "status": "Login Status",
       "connected": "Connected to Microsoft account",
       "notConnected": "Not connected",

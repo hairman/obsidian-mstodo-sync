@@ -9,7 +9,7 @@ export class GraphClient {
 	/**
 	 * Обертка над requestUrl с автоматической подстановкой токена.
 	 */
-	private async request(url: string, method: string = 'GET', body?: any) {
+	private async request(url: string, method = 'GET', body?: unknown) {
 		const token = await this.auth.getAccessToken();
 		if (!token) throw new Error('Not authenticated');
 

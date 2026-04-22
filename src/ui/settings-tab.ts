@@ -13,13 +13,13 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass('mstodo-sync-settings');
 
-		containerEl.createEl('h2', { text: t('settings.title') });
+		new Setting(containerEl).setName(t('settings.title')).setHeading();
 
 		new Setting(containerEl)
 			.setName(t('settings.auth.clientId'))
 			.setDesc(t('settings.auth.clientIdDesc'))
 			.addText(text => text
-				.setPlaceholder('Enter Client ID')
+				.setPlaceholder(t('settings.auth.clientIdPlaceholder'))
 				.setValue(this.plugin.settings.clientId)
 				.onChange(async (value) => {
 					this.plugin.settings.clientId = value;
@@ -46,12 +46,12 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 			statusSetting.addButton(button => button
 				.setButtonText(t('settings.auth.login'))
 				.setWarning()
-				.onClick(async () => {
-					(this.plugin.app as any).commands.executeCommandById('microsoft-to-do-sync:login');
+				.onClick(() => {
+					(this.app as any).commands.executeCommandById('microsoft-to-do-sync:login');
 				}));
 		}
 
-		containerEl.createEl('h3', { text: t('settings.targets.header') });
+		new Setting(containerEl).setName(t('settings.targets.header')).setHeading();
 
 		new Setting(containerEl)
 			.setName(t('settings.targets.todoList'))
@@ -62,11 +62,11 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 					const lists = await this.plugin.graphClient.getTodoLists();
 					dropdown.selectEl.empty();
 					dropdown.addOption('', t('settings.targets.todoListSelect'));
-					lists.forEach((list: any) => {
+					lists.forEach((list: { id: string, displayName: string }) => {
 						dropdown.addOption(list.id, list.displayName);
 					});
 					dropdown.setValue(this.plugin.settings.defaultTodoListId);
-				} catch (e) {
+				} catch {
 					dropdown.addOption('', t('settings.targets.todoListError'));
 				}
 				dropdown.onChange(async (value) => {
@@ -132,7 +132,7 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		containerEl.createEl('h3', { text: t('settings.behavior.header') });
+		new Setting(containerEl).setName(t('settings.behavior.header')).setHeading();
 
 		new Setting(containerEl)
 			.setName(t('settings.behavior.interval'))
@@ -151,7 +151,7 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 				.addOption('local-wins', t('settings.behavior.conflictOptions.local'))
 				.addOption('newest-wins', t('settings.behavior.conflictOptions.newest'))
 				.setValue(this.plugin.settings.conflictStrategy)
-				.onChange(async (value: any) => {
+				.onChange(async (value: 'remote-wins' | 'local-wins' | 'newest-wins') => {
 					this.plugin.settings.conflictStrategy = value;
 					await this.plugin.saveSettings();
 				}));

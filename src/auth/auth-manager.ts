@@ -94,7 +94,7 @@ export class AuthManager {
 		return response.json as TokenResponse;
 	}
 
-	private async storeTokens(tokens: TokenResponse): Promise<void> {
+	private storeTokens(tokens: TokenResponse): void {
 		this.settings.accessToken = tokens.access_token;
 		if (tokens.refresh_token) {
 			this.settings.refreshToken = tokens.refresh_token;

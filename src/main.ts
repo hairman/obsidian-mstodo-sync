@@ -31,18 +31,18 @@ export default class MsTodoSyncPlugin extends Plugin {
 
 		// Добавление кнопки синхронизации на боковую панель с кастомной иконкой
 		this.addRibbonIcon('mstodo-logo', t('ribbon.tooltip'), () => {
-			this.syncEngine.runSync();
+			void this.syncEngine.runSync();
 		});
 
 		// Регистрация хендлера протокола для авторизации
 		this.registerObsidianProtocolHandler('mstodo-sync-auth', async (data: ObsidianProtocolData) => {
-			console.log('[MsTodoSync] Received auth callback data:', data);
+			console.debug('[MsTodoSync] Received auth callback data:', data);
 			
 			if (data.code) {
 				new Notice(t('notices.connecting'));
 				try {
 					const verifier = this.settings.pkceVerifier;
-					console.log('[MsTodoSync] Using verifier from settings:', verifier ? 'found' : 'missing');
+					console.debug('[MsTodoSync] Using verifier from settings:', verifier ? 'found' : 'missing');
 					
 					if (!verifier) {
 						throw new Error(t('notices.noVerifier'));
@@ -59,12 +59,12 @@ export default class MsTodoSyncPlugin extends Plugin {
 					// Если есть открытая вкладка настроек, обновляем её
 					this.app.workspace.getLeavesOfType('mstodo-sync-settings').forEach(leaf => {
 						if (leaf.view instanceof MsTodoSyncSettingTab) {
-							(leaf.view as any).display();
+							(leaf.view as MsTodoSyncSettingTab).display();
 						}
 					});
 				} catch (e) {
 					console.error('[MsTodoSync] Auth exchange error:', e);
-					new Notice(t('notices.authError', { error: e.message }));
+					new Notice(t('notices.authError', { error: (e as Error).message }));
 				}
 			} else if (data.error) {
 				console.error('[MsTodoSync] Microsoft returned error:', data.error, data.error_description);
@@ -76,7 +76,9 @@ export default class MsTodoSyncPlugin extends Plugin {
 		this.addCommand({
 			id: 'sync-now',
 			name: t('commands.syncNow'),
-			callback: () => this.syncEngine.runSync()
+			callback: () => {
+				void this.syncEngine.runSync();
+			}
 		});
 
 		this.addCommand({
@@ -92,7 +94,7 @@ export default class MsTodoSyncPlugin extends Plugin {
 				this.settings.pkceVerifier = verifier;
 				await this.saveSettings();
 				
-				console.log('[MsTodoSync] Starting login flow. Verifier saved.');
+				console.debug('[MsTodoSync] Starting login flow. Verifier saved.');
 				
 				const url = await this.auth.generateAuthUrl(verifier);
 				window.open(url);
@@ -119,15 +121,15 @@ export default class MsTodoSyncPlugin extends Plugin {
 		this.addSettingTab(new MsTodoSyncSettingTab(this.app, this));
 	}
 
-	async onunload() {
-		console.log('[MsTodoSync] Unloading plugin');
+	onunload() {
+		console.debug('[MsTodoSync] Unloading plugin');
 	}
 
 	private setupAutoSync() {
 		if (this.settings.syncIntervalMinutes > 0) {
 			this.registerInterval(
 				window.setInterval(() => {
-					this.syncEngine.runSync();
+					void this.syncEngine.runSync();
 				}, this.settings.syncIntervalMinutes * 60 * 1000)
 			);
 		}

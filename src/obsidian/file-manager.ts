@@ -31,7 +31,7 @@ export class ObsidianFileManager {
 	/**
 	 * Поиск заметки-задачи по msTodoId.
 	 */
-	async findTaskFileById(msTodoId: string, folderPath: string): Promise<TFile | null> {
+	findTaskFileById(msTodoId: string, folderPath: string): TFile | null {
 		const files = this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(folderPath));
 		for (const file of files) {
 			const cache = this.app.metadataCache.getFileCache(file);
