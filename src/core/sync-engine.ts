@@ -135,7 +135,7 @@ export class SyncEngine {
 
 			// Проверяем наличие тега в кэше
 			const hasTag = cache.tags?.some(tag => tag.tag === syncTag) || 
-						  cache.frontmatter?.tags?.includes(syncTag.replace('#', ''));
+						cache.frontmatter?.tags?.includes(syncTag.replace('#', ''));
 			
 			if (!hasTag) {
 				// Дополнительная проверка: тег может быть просто текстом в строке, 
