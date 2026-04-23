@@ -124,7 +124,9 @@ export class SyncEngine {
 		const { syncTag, taskNotesFolder } = this.settings;
 		if (!syncTag) return;
 		
-		// Используем метаданные вместо чтения всех файлов
+		const tagWithHash = syncTag.startsWith('#') ? syncTag : '#' + syncTag;
+		const tagWithoutHash = tagWithHash.substring(1);
+		
 		const allFiles = this.app.vault.getMarkdownFiles();
 		
 		for (const file of allFiles) {
@@ -133,16 +135,11 @@ export class SyncEngine {
 			const cache = this.app.metadataCache.getFileCache(file);
 			if (!cache) continue;
 
-			// Проверяем наличие тега в кэше
-			const hasTag = cache.tags?.some(tag => tag.tag === syncTag) || 
-						cache.frontmatter?.tags?.includes(syncTag.replace('#', ''));
+			// Проверяем наличие тега в кэше (независимо от регистра и наличия #)
+			const hasTag = cache.tags?.some(t => t.tag.toLowerCase() === tagWithHash.toLowerCase()) || 
+						cache.frontmatter?.tags?.some((t: string) => t.toLowerCase() === tagWithoutHash.toLowerCase());
 			
-			if (!hasTag) {
-				// Дополнительная проверка: тег может быть просто текстом в строке, 
-				// но если его нет в кэше тегов, значит он не индексирован как тег.
-				// Однако для надежности и производительности полагаемся на кэш.
-				continue;
-			}
+			if (!hasTag) continue;
 
 			const content = await this.app.vault.read(file);
 			const lines = content.split('\n');
@@ -151,11 +148,19 @@ export class SyncEngine {
 
 			for (let i = 0; i < lines.length; i++) {
 				const line = lines[i];
-				if (line.includes(syncTag) && line.trim().startsWith('- [') && !line.includes(' ^')) {
-					const match = line.match(/- \[([ xX])\]\s*(.*?)\s*(#\S+)/);
+				const lowerLine = line.toLowerCase();
+				
+				if (lowerLine.includes(tagWithHash.toLowerCase()) && line.trim().startsWith('- [') && !line.includes(' ^')) {
+					// Регулярное выражение для извлечения статуса, заголовка и тега
+					// Ищем тег в любом месте строки задачи
+					const escapedTag = tagWithHash.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+					const regex = new RegExp(`- \\[([ xX])\\]\\s*(.*?)\\s*(${escapedTag})\\s*(.*)`);
+					const match = line.match(regex);
+					
 					if (match) {
 						const completed = match[1].toLowerCase() === 'x';
-						const title = match[2].trim();
+						// Собираем заголовок, исключая сам тег
+						const title = (match[2] + ' ' + match[4]).trim();
 						const blockId = this.fileManager.generateBlockId();
 						
 						const metadata: TaskFrontMatter = {
@@ -166,7 +171,7 @@ export class SyncEngine {
 							msTodoSyncStatus: 'pending',
 							sourceDailyNotePath: file.path,
 							sourceBlockId: blockId,
-							syncTag: syncTag,
+							syncTag: tagWithHash,
 							localCompleted: completed,
 							lastSyncedCompleted: false,
 							localUpdatedAt: Date.now()
