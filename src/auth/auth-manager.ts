@@ -22,7 +22,7 @@ export class AuthManager {
 		if (refreshToken) {
 			try {
 				const tokens = await this.refreshAccessToken(refreshToken);
-				await this.storeTokens(tokens);
+				this.storeTokens(tokens);
 				return tokens.access_token;
 			} catch (e) {
 				console.error('[MsTodoSync] Failed to refresh token:', e);
@@ -69,7 +69,7 @@ export class AuthManager {
 			throw new Error(`Failed to exchange code: ${response.text}`);
 		}
 
-		await this.storeTokens(response.json as TokenResponse);
+		this.storeTokens(response.json as TokenResponse);
 	}
 
 	private async refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
