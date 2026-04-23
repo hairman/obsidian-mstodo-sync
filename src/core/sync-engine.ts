@@ -291,9 +291,7 @@ export class SyncEngine {
 
 	private async createNewLocalTask(remote: GraphTask) {
 		const blockId = this.fileManager.generateBlockId();
-		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-		// @ts-ignore
-		const createdDate = moment(remote.createdDateTime);
+		const createdDate = moment.utc(remote.createdDateTime).local();
 		const dailyNotePath = this.getDailyNotePath(createdDate);
 		
 		const metadata: TaskFrontMatter = {
