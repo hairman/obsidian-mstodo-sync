@@ -12,11 +12,12 @@ import { t } from './i18n/helpers';
 const MSTODO_ICON_SVG = `<circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" stroke-width="8" /><path d="M30 52l15 15 30-35" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />`;
 
 export default class MsTodoSyncPlugin extends Plugin {
-	settings: MsTodoSyncSettings;
-	auth: AuthManager;
-	graphClient: GraphClient;
-	fileManager: ObsidianFileManager;
-	syncEngine: SyncEngine;
+	settings: MsTodoSyncSettings = DEFAULT_SETTINGS;
+	auth!: AuthManager;
+	graphClient!: GraphClient;
+	fileManager!: ObsidianFileManager;
+	syncEngine!: SyncEngine;
+
 
 	async onload() {
 		await this.loadSettings();

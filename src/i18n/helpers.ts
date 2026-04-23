@@ -15,7 +15,12 @@ export function t(path: string, vars?: { [key: string]: string }): string {
     const lang = moment.locale();
     const locale = locales[lang] || locales['en'];
     
-    const value = path.split('.').reduce((obj: any, key) => obj?.[key], locale);
+    const value = path.split('.').reduce<Record<string, unknown> | string | undefined>((obj, key) => {
+        if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+            return (obj as Record<string, unknown>)[key] as Record<string, unknown> | string | undefined;
+        }
+        return undefined;
+    }, locale);
     
     if (!value || typeof value !== 'string') {
         console.warn(`[MsTodoSync] Translation missing for key: ${path}`);

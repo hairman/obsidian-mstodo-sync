@@ -3,6 +3,15 @@ import MsTodoSyncPlugin from '../main';
 import { FileSuggest, FolderSuggest } from './suggest';
 import { t } from '../i18n/helpers';
 
+/**
+ * Расширенный интерфейс App для доступа к внутренним командам Obsidian.
+ */
+interface AppWithCommands extends App {
+    commands: {
+        executeCommandById(id: string): boolean;
+    };
+}
+
 export class MsTodoSyncSettingTab extends PluginSettingTab {
 	constructor(app: App, private plugin: MsTodoSyncPlugin) {
 		super(app, plugin);
@@ -47,7 +56,7 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 				.setButtonText(t('settings.auth.login'))
 				.setWarning()
 				.onClick(() => {
-					(this.app as any).commands.executeCommandById('microsoft-to-do-sync:login');
+					(this.app as AppWithCommands).commands.executeCommandById('microsoft-to-do-sync:login');
 				}));
 		}
 
@@ -151,8 +160,8 @@ export class MsTodoSyncSettingTab extends PluginSettingTab {
 				.addOption('local-wins', t('settings.behavior.conflictOptions.local'))
 				.addOption('newest-wins', t('settings.behavior.conflictOptions.newest'))
 				.setValue(this.plugin.settings.conflictStrategy)
-				.onChange(async (value: 'remote-wins' | 'local-wins' | 'newest-wins') => {
-					this.plugin.settings.conflictStrategy = value;
+				.onChange(async (value) => {
+					this.plugin.settings.conflictStrategy = value as 'remote-wins' | 'local-wins' | 'newest-wins';
 					await this.plugin.saveSettings();
 				}));
 
